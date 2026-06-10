@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth, type Profile } from '../lib/auth';
-import { MessageCircle, Send, X, CheckCircle, Clock, UserCircle, Plus, ArrowLeft } from 'lucide-react';
+import { MessageCircle, Send, X, CheckCircle, Clock, CircleUser as UserCircle, Plus, ArrowLeft } from 'lucide-react';
 
 interface Chat {
   id: string;
@@ -40,6 +40,7 @@ export default function ChatsPage() {
   const [newMsgInit, setNewMsgInit] = useState('');
   const [creatingChat, setCreatingChat] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const shouldScrollRef = useRef(false);
   const isStaffOrAdmin = profile?.role === 'admin' || profile?.role === 'staff';
 
   useEffect(() => {
@@ -48,11 +49,17 @@ export default function ChatsPage() {
   }, [user]);
 
   useEffect(() => {
-    if (selectedChat) fetchMessages(selectedChat.id);
+    if (selectedChat) {
+      shouldScrollRef.current = true;
+      fetchMessages(selectedChat.id);
+    }
   }, [selectedChat?.id]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (shouldScrollRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      shouldScrollRef.current = false;
+    }
   }, [messages]);
 
   async function fetchChats() {
@@ -109,6 +116,7 @@ export default function ChatsPage() {
     });
     setNewMsg('');
     setSending(false);
+    shouldScrollRef.current = true;
     fetchMessages(selectedChat.id);
     fetchChats();
   }
@@ -225,7 +233,7 @@ export default function ChatsPage() {
                       </div>
                       <div className="flex items-center justify-between mt-0.5">
                         <span className="text-xs text-gray-500 truncate">{chat.last_message || (chat.subject || 'Нет сообщений')}</span>
-                        {chat.unread_count > 0 && (
+                        {(chat.unread_count ?? 0) > 0 && (
                           <span className="bg-orange-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center shrink-0 ml-1">{chat.unread_count}</span>
                         )}
                       </div>

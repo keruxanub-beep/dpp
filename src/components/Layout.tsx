@@ -28,8 +28,6 @@ export default function Layout() {
     setMenuOpen(false);
   };
 
-  const isStaffOrAdmin = profile?.role === 'admin' || profile?.role === 'staff';
-
   return (
     <div className="min-h-screen flex flex-col bg-white">
       <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-orange-100 shadow-sm">

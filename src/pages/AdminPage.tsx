@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
-import { Plus, Trash2, Edit3, X, PawPrint, Users, BarChart3, Shield, Ban, Unlock, Send, Mail, UserCog, Lock } from 'lucide-react';
+import { Plus, Trash2, Edit3, X, PawPrint, Users, BarChart3, Shield, Ban, Unlock, Send, Mail, UserCog, Lock, FileText, Check, XCircle, Clock } from 'lucide-react';
 import type { Pet } from '../lib/types';
 import type { Profile } from '../lib/auth';
+import type { AdoptionRequest } from '../lib/types';
 
 const speciesOptions = [
   { value: 'dog', label: 'Собака' },
@@ -48,6 +49,7 @@ export default function AdminPage() {
   const { profile } = useAuth();
   const [pets, setPets] = useState<Pet[]>([]);
   const [users, setUsers] = useState<Profile[]>([]);
+  const [adoptionRequests, setAdoptionRequests] = useState<AdoptionRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPetModal, setShowPetModal] = useState(false);
   const [showMsgModal, setShowMsgModal] = useState(false);
@@ -57,9 +59,10 @@ export default function AdminPage() {
   const [editing, setEditing] = useState<Pet | null>(null);
   const [form, setForm] = useState<PetForm>(emptyForm);
   const [saving, setSaving] = useState(false);
-  const [tab, setTab] = useState<'pets' | 'users' | 'stats'>('pets');
+  const [tab, setTab] = useState<'pets' | 'users' | 'stats' | 'adoptions'>('pets');
+  const [reviewNotes, setReviewNotes] = useState('');
 
-  useEffect(() => { fetchPets(); fetchUsers(); }, []);
+  useEffect(() => { fetchPets(); fetchUsers(); fetchAdoptionRequests(); }, []);
 
   async function fetchPets() {
     setLoading(true);
@@ -71,6 +74,14 @@ export default function AdminPage() {
   async function fetchUsers() {
     const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
     setUsers((data as Profile[]) || []);
+  }
+
+  async function fetchAdoptionRequests() {
+    const { data } = await supabase
+      .from('adoption_requests')
+      .select('*, pet:pets(id, name, species, breed, image_url), user_profile:profiles!adoption_requests_user_id_fkey(id, email, full_name)')
+      .order('created_at', { ascending: false });
+    setAdoptionRequests((data as AdoptionRequest[]) || []);
   }
 
   function openAdd() {
@@ -119,14 +130,16 @@ export default function AdminPage() {
   }
 
   async function changeRole(userId: string, newRole: 'user' | 'staff') {
-    await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
+    const { error } = await supabase.rpc('admin_change_role', { target_user_id: userId, new_role: newRole });
+    if (error) { alert('Ошибка: ' + error.message); return; }
     fetchUsers();
   }
 
   async function toggleBlock(userId: string, currentlyBlocked: boolean) {
     const action = currentlyBlocked ? 'разблокировать' : 'заблокировать';
     if (!confirm(`Вы уверены, что хотите ${action} этого пользователя?`)) return;
-    await supabase.from('profiles').update({ blocked: !currentlyBlocked }).eq('id', userId);
+    const { error } = await supabase.rpc('admin_toggle_block', { target_user_id: userId, should_block: !currentlyBlocked });
+    if (error) { alert('Ошибка: ' + error.message); return; }
     fetchUsers();
   }
 
@@ -140,16 +153,38 @@ export default function AdminPage() {
     e.preventDefault();
     if (!msgTo || !msgContent.trim()) return;
     setSendingMsg(true);
-    await supabase.from('messages').insert({
-      sender_id: profile!.id,
-      receiver_id: msgTo.id,
-      content: msgContent.trim(),
-    });
+    const { data: chat, error: chatErr } = await supabase.from('chats').insert({
+      user_id: msgTo.id,
+      staff_id: profile!.id,
+      status: 'claimed',
+      subject: 'Сообщение от администратора',
+    }).select().single();
+    if (chatErr || !chat) {
+      alert('Не удалось создать чат: ' + (chatErr?.message || 'Ошибка'));
+      setSendingMsg(false);
+      return;
+    }
+    await supabase.rpc('send_chat_message', { p_chat_id: chat.id, p_content: msgContent.trim() });
     setSendingMsg(false);
     setShowMsgModal(false);
     setMsgTo(null);
     setMsgContent('');
   }
+
+  async function handleReviewRequest(requestId: string, newStatus: 'approved' | 'rejected') {
+    const { error } = await supabase.rpc('review_adoption_request', {
+      request_id: requestId,
+      new_status: newStatus,
+      notes: reviewNotes || null,
+    });
+    if (error) { alert('Ошибка: ' + error.message); return; }
+    setReviewNotes('');
+    fetchAdoptionRequests();
+    fetchPets();
+  }
+
+  const pendingRequests = adoptionRequests.filter(r => r.status === 'pending');
+  const processedRequests = adoptionRequests.filter(r => r.status !== 'pending');
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -159,7 +194,7 @@ export default function AdminPage() {
       </div>
 
       {/* Stats cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
         <div className="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center">
@@ -193,15 +228,29 @@ export default function AdminPage() {
             </div>
           </div>
         </div>
+        <div className="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-yellow-100 flex items-center justify-center">
+              <FileText className="w-5 h-5 text-yellow-600" />
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-gray-900">{pendingRequests.length}</div>
+              <div className="text-sm text-gray-500">Заявок</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1 w-fit">
+      <div className="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1 w-fit flex-wrap">
         <button onClick={() => setTab('pets')} className={`px-4 py-2 rounded-lg font-medium text-sm transition ${tab === 'pets' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
           Питомцы
         </button>
         <button onClick={() => setTab('users')} className={`px-4 py-2 rounded-lg font-medium text-sm transition ${tab === 'users' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
           Пользователи
+        </button>
+        <button onClick={() => setTab('adoptions')} className={`px-4 py-2 rounded-lg font-medium text-sm transition ${tab === 'adoptions' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
+          Заявки {pendingRequests.length > 0 && <span className="ml-1 bg-orange-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5">{pendingRequests.length}</span>}
         </button>
         <button onClick={() => setTab('stats')} className={`px-4 py-2 rounded-lg font-medium text-sm transition ${tab === 'stats' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
           Статистика
@@ -333,20 +382,12 @@ export default function AdminPage() {
                               </button>
                             )}
                             {u.role !== 'admin' && !u.blocked && (
-                              <button
-                                onClick={() => toggleBlock(u.id, false)}
-                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-700 hover:bg-red-100 transition"
-                                title="Заблокировать"
-                              >
+                              <button onClick={() => toggleBlock(u.id, false)} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-700 hover:bg-red-100 transition" title="Заблокировать">
                                 <Ban className="w-3.5 h-3.5" /> Блок
                               </button>
                             )}
                             {u.role !== 'admin' && u.blocked && (
-                              <button
-                                onClick={() => toggleBlock(u.id, true)}
-                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-green-50 text-green-700 hover:bg-green-100 transition"
-                                title="Разблокировать"
-                              >
+                              <button onClick={() => toggleBlock(u.id, true)} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-green-50 text-green-700 hover:bg-green-100 transition" title="Разблокировать">
                                 <Unlock className="w-3.5 h-3.5" /> Разблок
                               </button>
                             )}
@@ -360,6 +401,103 @@ export default function AdminPage() {
             </div>
           )}
         </>
+      )}
+
+      {/* Adoption requests tab */}
+      {tab === 'adoptions' && (
+        <div className="space-y-8">
+          <h2 className="text-lg font-bold text-gray-900">Заявки на усыновление</h2>
+          {pendingRequests.length === 0 && processedRequests.length === 0 ? (
+            <div className="text-center py-12 text-gray-400"><FileText className="w-12 h-12 mx-auto mb-3 opacity-50" /><p>Заявок пока нет</p></div>
+          ) : (
+            <>
+              {pendingRequests.length > 0 && (
+                <div>
+                  <h3 className="text-md font-semibold text-yellow-700 mb-3 flex items-center gap-2"><Clock className="w-4 h-4" /> Ожидают рассмотрения ({pendingRequests.length})</h3>
+                  <div className="space-y-4">
+                    {pendingRequests.map((req) => (
+                      <div key={req.id} className="bg-white rounded-xl border border-yellow-200 p-6 shadow-sm">
+                        <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+                          <img
+                            src={req.pet?.image_url || defaultPetImages[req.pet?.species || 'other']}
+                            alt={req.pet?.name}
+                            className="w-20 h-20 rounded-xl object-cover shrink-0"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="font-bold text-gray-900">{req.pet?.name || 'Питомец'}</h4>
+                              <span className="px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 text-xs font-medium">Ожидание</span>
+                            </div>
+                            <p className="text-sm text-gray-500 mt-1">От: {req.user_profile?.full_name || req.user_profile?.email || 'Пользователь'}</p>
+                            <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                              <div><span className="text-gray-400">Имя:</span> <span className="text-gray-700">{req.full_name}</span></div>
+                              <div><span className="text-gray-400">Телефон:</span> <span className="text-gray-700">{req.phone}</span></div>
+                              <div><span className="text-gray-400">Email:</span> <span className="text-gray-700">{req.email}</span></div>
+                              <div><span className="text-gray-400">Жильё:</span> <span className="text-gray-700">{req.home_type === 'apartment' ? 'Квартира' : req.home_type === 'house' ? 'Дом' : req.home_type === 'other' ? 'Другое' : '-'}</span></div>
+                              <div><span className="text-gray-400">Другие питомцы:</span> <span className="text-gray-700">{req.has_other_pets ? 'Да' : 'Нет'}{req.other_pets_desc ? ` — ${req.other_pets_desc}` : ''}</span></div>
+                              <div><span className="text-gray-400">Опыт:</span> <span className="text-gray-700">{req.experience || '-'}</span></div>
+                            </div>
+                            <div className="mt-2 text-sm"><span className="text-gray-400">Причина:</span> <span className="text-gray-700">{req.reason}</span></div>
+                            <div className="mt-4">
+                              <input
+                                type="text"
+                                placeholder="Заметка администратора (необязательно)"
+                                value={reviewNotes}
+                                onChange={(e) => setReviewNotes(e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-300 text-sm"
+                              />
+                            </div>
+                            <div className="mt-3 flex gap-3">
+                              <button onClick={() => handleReviewRequest(req.id, 'approved')} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-green-500 text-white text-sm font-semibold hover:bg-green-600 transition">
+                                <Check className="w-4 h-4" /> Одобрить
+                              </button>
+                              <button onClick={() => handleReviewRequest(req.id, 'rejected')} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-red-500 text-white text-sm font-semibold hover:bg-red-600 transition">
+                                <XCircle className="w-4 h-4" /> Отклонить
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {processedRequests.length > 0 && (
+                <div>
+                  <h3 className="text-md font-semibold text-gray-700 mb-3">Рассмотренные заявки</h3>
+                  <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead><tr className="border-b border-gray-100 bg-gray-50">
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Питомец</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Заявитель</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Статус</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase hidden sm:table-cell">Заметка</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase hidden md:table-cell">Дата</th>
+                        </tr></thead>
+                        <tbody>
+                          {processedRequests.map((req) => (
+                            <tr key={req.id} className="border-b border-gray-50">
+                              <td className="px-4 py-3 text-sm font-medium text-gray-900">{req.pet?.name || 'Питомец'}</td>
+                              <td className="px-4 py-3 text-sm text-gray-600">{req.user_profile?.full_name || req.user_profile?.email}</td>
+                              <td className="px-4 py-3">
+                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${req.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                  {req.status === 'approved' ? 'Одобрена' : 'Отклонена'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-500 hidden sm:table-cell truncate max-w-[200px]">{req.admin_notes || '-'}</td>
+                              <td className="px-4 py-3 text-sm text-gray-400 hidden md:table-cell">{new Date(req.reviewed_at || req.created_at).toLocaleDateString('ru-RU')}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       )}
 
       {/* Stats tab */}
@@ -398,6 +536,26 @@ export default function AdminPage() {
                 <div className="w-3 h-3 rounded-full bg-red-500 mb-3" />
                 <div className="text-3xl font-bold text-gray-900">{users.filter(u => u.blocked).length}</div>
                 <div className="text-sm text-gray-500 mt-1">Заблокированных</div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-gray-900 mb-4">Заявки на усыновление</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-white rounded-xl border border-gray-100 p-6 shadow-sm">
+                <div className="w-3 h-3 rounded-full bg-yellow-500 mb-3" />
+                <div className="text-3xl font-bold text-gray-900">{pendingRequests.length}</div>
+                <div className="text-sm text-gray-500 mt-1">Ожидают</div>
+              </div>
+              <div className="bg-white rounded-xl border border-gray-100 p-6 shadow-sm">
+                <div className="w-3 h-3 rounded-full bg-green-500 mb-3" />
+                <div className="text-3xl font-bold text-gray-900">{adoptionRequests.filter(r => r.status === 'approved').length}</div>
+                <div className="text-sm text-gray-500 mt-1">Одобрены</div>
+              </div>
+              <div className="bg-white rounded-xl border border-gray-100 p-6 shadow-sm">
+                <div className="w-3 h-3 rounded-full bg-red-500 mb-3" />
+                <div className="text-3xl font-bold text-gray-900">{adoptionRequests.filter(r => r.status === 'rejected').length}</div>
+                <div className="text-sm text-gray-500 mt-1">Отклонены</div>
               </div>
             </div>
           </div>

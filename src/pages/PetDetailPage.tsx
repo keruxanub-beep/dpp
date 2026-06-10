@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { ArrowLeft, MapPin, Calendar, Heart, Share2, PawPrint, Check } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, Heart, Share2, PawPrint, Check, X, Send, AlertCircle, Clock, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import type { Pet } from '../lib/types';
 
@@ -9,7 +9,10 @@ const speciesLabels: Record<string, string> = {
   dog: 'Собака', cat: 'Кошка', bird: 'Птица', rabbit: 'Кролик', other: 'Другое',
 };
 const statusLabels: Record<string, string> = {
-  available: 'Доступен для усыновления', adopted: 'Усыновлён', pending: 'Ожидание',
+  available: 'Доступен для усыновления', adopted: 'Усыновлён', pending: 'Заявка на рассмотрении',
+};
+const statusColors: Record<string, string> = {
+  available: 'bg-green-100 text-green-700', adopted: 'bg-gray-100 text-gray-500', pending: 'bg-yellow-100 text-yellow-700',
 };
 const petImages: Record<string, string> = {
   dog: 'https://images.pexels.com/photos/1851164/pexels-photo-1851164.jpeg?auto=compress&cs=tinysrgb&w=800',
@@ -19,14 +22,36 @@ const petImages: Record<string, string> = {
   other: 'https://images.pexels.com/photos/4587995/pexels-photo-4587995.jpeg?auto=compress&cs=tinysrgb&w=800',
 };
 
+interface AdoptionForm {
+  full_name: string;
+  phone: string;
+  email: string;
+  home_type: '' | 'apartment' | 'house' | 'other';
+  has_other_pets: boolean;
+  other_pets_desc: string;
+  experience: string;
+  reason: string;
+}
+const emptyForm: AdoptionForm = {
+  full_name: '', phone: '', email: '', home_type: '',
+  has_other_pets: false, other_pets_desc: '', experience: '', reason: '',
+};
+
 export default function PetDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [pet, setPet] = useState<Pet | null>(null);
   const [loading, setLoading] = useState(true);
   const [isFavorited, setIsFavorited] = useState(false);
   const [copied, setCopied] = useState(false);
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
+
+  const [showAdoptionForm, setShowAdoptionForm] = useState(false);
+  const [adoptionForm, setAdoptionForm] = useState<AdoptionForm>(emptyForm);
+  const [submitting, setSubmitting] = useState(false);
+  const [adoptionError, setAdoptionError] = useState('');
+  const [adoptionSuccess, setAdoptionSuccess] = useState(false);
+  const [existingRequest, setExistingRequest] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -41,7 +66,20 @@ export default function PetDetailPage() {
     supabase.from('favorites').select('id').eq('pet_id', id).eq('user_id', user.id).maybeSingle().then(({ data }) => {
       setIsFavorited(!!data);
     });
+    supabase.from('adoption_requests').select('id').eq('pet_id', id).eq('user_id', user.id).eq('status', 'pending').maybeSingle().then(({ data }) => {
+      setExistingRequest(!!data);
+    });
   }, [id, user]);
+
+  useEffect(() => {
+    if (profile && showAdoptionForm) {
+      setAdoptionForm(prev => ({
+        ...prev,
+        full_name: prev.full_name || profile.full_name || '',
+        email: prev.email || profile.email || '',
+      }));
+    }
+  }, [profile, showAdoptionForm]);
 
   async function handleToggleFavorite() {
     if (!user || !id) return;
@@ -59,6 +97,38 @@ export default function PetDetailPage() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
+  }
+
+  async function handleAdoptionSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!user || !pet) return;
+    setAdoptionError('');
+    setSubmitting(true);
+
+    const { error } = await supabase.from('adoption_requests').insert({
+      user_id: user.id,
+      pet_id: pet.id,
+      full_name: adoptionForm.full_name,
+      phone: adoptionForm.phone,
+      email: adoptionForm.email,
+      home_type: adoptionForm.home_type,
+      has_other_pets: adoptionForm.has_other_pets,
+      other_pets_desc: adoptionForm.other_pets_desc || null,
+      experience: adoptionForm.experience || null,
+      reason: adoptionForm.reason,
+    });
+
+    if (error) {
+      setAdoptionError(error.message);
+      setSubmitting(false);
+      return;
+    }
+
+    await supabase.from('pets').update({ status: 'pending' }).eq('id', pet.id);
+    setPet({ ...pet, status: 'pending' });
+    setAdoptionSuccess(true);
+    setSubmitting(false);
+    setExistingRequest(true);
   }
 
   if (loading) return <div className="flex items-center justify-center min-h-[60vh]"><div className="w-8 h-8 border-4 border-orange-200 border-t-orange-500 rounded-full animate-spin" /></div>;
@@ -105,7 +175,7 @@ export default function PetDetailPage() {
         </div>
 
         <div>
-          <div className="inline-block px-3 py-1 rounded-full text-xs font-semibold mb-3 bg-green-100 text-green-700">
+          <div className={`inline-block px-3 py-1 rounded-full text-xs font-semibold mb-3 ${statusColors[pet.status]}`}>
             {statusLabels[pet.status]}
           </div>
           <h1 className="text-3xl font-extrabold text-gray-900">{pet.name}</h1>
@@ -139,15 +209,36 @@ export default function PetDetailPage() {
             </div>
           )}
 
-          {user && pet.status === 'available' && (
+          {/* Adoption actions */}
+          {user && pet.status === 'available' && !existingRequest && !adoptionSuccess && (
             <div className="mt-8">
-              <Link
-                to="/pets"
+              <button
+                onClick={() => setShowAdoptionForm(true)}
                 className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 text-white font-semibold shadow-lg shadow-orange-200 hover:shadow-xl hover:from-orange-600 hover:to-orange-700 transition-all"
               >
                 <Heart className="w-5 h-5" />
                 Хочу усыновить
-              </Link>
+              </button>
+            </div>
+          )}
+
+          {user && pet.status === 'pending' && existingRequest && !adoptionSuccess && (
+            <div className="mt-8 flex items-center gap-2 px-5 py-4 rounded-xl bg-yellow-50 border border-yellow-200">
+              <Clock className="w-5 h-5 text-yellow-600 shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-yellow-800">Ваша заявка на рассмотрении</p>
+                <p className="text-xs text-yellow-600 mt-0.5">Администратор рассмотрит вашу заявку в ближайшее время</p>
+              </div>
+            </div>
+          )}
+
+          {adoptionSuccess && (
+            <div className="mt-8 flex items-center gap-2 px-5 py-4 rounded-xl bg-green-50 border border-green-200">
+              <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-green-800">Заявка отправлена!</p>
+                <p className="text-xs text-green-600 mt-0.5">Статус питомца изменён на «Ожидание». Мы уведомим вас о решении.</p>
+              </div>
             </div>
           )}
 
@@ -159,6 +250,72 @@ export default function PetDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Adoption request modal */}
+      {showAdoptionForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b border-gray-100">
+              <h3 className="text-lg font-bold text-gray-900">Заявка на усыновление</h3>
+              <button onClick={() => setShowAdoptionForm(false)} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 transition"><X className="w-5 h-5" /></button>
+            </div>
+            <form onSubmit={handleAdoptionSubmit} className="p-6 space-y-4">
+              {adoptionError && (
+                <div className="p-3 rounded-xl bg-red-50 border border-red-200 flex items-start gap-2">
+                  <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                  <span className="text-sm text-red-700">{adoptionError}</span>
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">ФИО *</label>
+                <input required value={adoptionForm.full_name} onChange={(e) => setAdoptionForm({ ...adoptionForm, full_name: e.target.value })} className="w-full px-3 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-300" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Телефон *</label>
+                  <input required value={adoptionForm.phone} onChange={(e) => setAdoptionForm({ ...adoptionForm, phone: e.target.value })} placeholder="+7 (999) 123-45-67" className="w-full px-3 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-300" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                  <input required type="email" value={adoptionForm.email} onChange={(e) => setAdoptionForm({ ...adoptionForm, email: e.target.value })} className="w-full px-3 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-300" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Тип жилья *</label>
+                <select required value={adoptionForm.home_type} onChange={(e) => setAdoptionForm({ ...adoptionForm, home_type: e.target.value as AdoptionForm['home_type'] })} className="w-full px-3 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-300 bg-white">
+                  <option value="">Выберите</option>
+                  <option value="apartment">Квартира</option>
+                  <option value="house">Дом</option>
+                  <option value="other">Другое</option>
+                </select>
+              </div>
+              <div>
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1">
+                  <input type="checkbox" checked={adoptionForm.has_other_pets} onChange={(e) => setAdoptionForm({ ...adoptionForm, has_other_pets: e.target.checked })} className="rounded border-gray-300 text-orange-500 focus:ring-orange-300" />
+                  Есть другие питомцы
+                </label>
+                {adoptionForm.has_other_pets && (
+                  <input value={adoptionForm.other_pets_desc} onChange={(e) => setAdoptionForm({ ...adoptionForm, other_pets_desc: e.target.value })} placeholder="Опишите ваших питомцев" className="w-full px-3 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-300 mt-2" />
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Опыт содержания животных</label>
+                <input value={adoptionForm.experience} onChange={(e) => setAdoptionForm({ ...adoptionForm, experience: e.target.value })} placeholder="Был ли у вас опыт..." className="w-full px-3 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-300" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Почему хотите усыновить? *</label>
+                <textarea required rows={3} value={adoptionForm.reason} onChange={(e) => setAdoptionForm({ ...adoptionForm, reason: e.target.value })} placeholder="Расскажите, почему именно этот питомец..." className="w-full px-3 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-300 resize-none" />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setShowAdoptionForm(false)} className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 font-semibold hover:bg-gray-50 transition">Отмена</button>
+                <button type="submit" disabled={submitting} className="flex-1 py-3 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 text-white font-semibold shadow-md hover:from-orange-600 hover:to-orange-700 transition-all disabled:opacity-60 inline-flex items-center justify-center gap-2">
+                  <Send className="w-4 h-4" /> {submitting ? 'Отправляем...' : 'Отправить заявку'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

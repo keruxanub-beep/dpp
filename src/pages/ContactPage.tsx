@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
-import { Mail, Phone, MapPin, Clock, Send, MessageCircle, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Mail, Phone, MapPin, Clock, Send, MessageCircle, AlertCircle } from 'lucide-react';
 
 export default function ContactPage() {
   const { user } = useAuth();
