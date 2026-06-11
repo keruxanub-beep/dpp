@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
-import { MapPin, Heart } from 'lucide-react';
+import { MapPin, Heart, PawPrint } from 'lucide-react';
+import { useState } from 'react';
 import type { Pet } from '../lib/types';
 
 const speciesLabels: Record<string, string> = {
@@ -30,19 +31,39 @@ interface PetCardProps {
 }
 
 export default function PetCard({ pet, isFavorited = false, onToggleFavorite }: PetCardProps) {
-  const img = pet.image_url || petImages[pet.species] || petImages.other;
+  const defaultImg = pet.image_url || petImages[pet.species] || petImages.other;
+  const [imgSrc, setImgSrc] = useState(defaultImg);
+  const [imgError, setImgError] = useState(false);
+
+  function handleImgError() {
+    if (!imgError) {
+      setImgError(true);
+      const fallback = petImages[pet.species] || petImages.other;
+      if (imgSrc !== fallback) {
+        setImgSrc(fallback);
+      }
+    }
+  }
 
   return (
     <Link
       to={`/pets/${pet.id}`}
       className="group bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-xl hover:shadow-orange-100/50 transition-all duration-300 hover:-translate-y-1"
     >
-      <div className="relative h-56 overflow-hidden">
-        <img
-          src={img}
-          alt={pet.name}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-        />
+      <div className="relative h-56 overflow-hidden bg-orange-50">
+        {imgSrc ? (
+          <img
+            src={imgSrc}
+            alt={pet.name}
+            loading="lazy"
+            onError={handleImgError}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <PawPrint className="w-16 h-16 text-orange-200" />
+          </div>
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
         <div className="absolute top-3 left-3">
           <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${statusColors[pet.status]}`}>

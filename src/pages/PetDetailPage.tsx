@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { ArrowLeft, MapPin, Calendar, Heart, Share2, PawPrint, Check, X, Send, AlertCircle, Clock, CheckCircle2 } from 'lucide-react';
+
 import { useAuth } from '../lib/auth';
 import type { Pet } from '../lib/types';
 
@@ -46,6 +47,7 @@ export default function PetDetailPage() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
 
+  const [imgError, setImgError] = useState(false);
   const [showAdoptionForm, setShowAdoptionForm] = useState(false);
   const [adoptionForm, setAdoptionForm] = useState<AdoptionForm>(emptyForm);
   const [submitting, setSubmitting] = useState(false);
@@ -152,8 +154,20 @@ export default function PetDetailPage() {
       </button>
 
       <div className="grid md:grid-cols-2 gap-8">
-        <div className="relative rounded-2xl overflow-hidden shadow-lg">
-          <img src={img} alt={pet.name} className="w-full h-[400px] object-cover" />
+        <div className="relative rounded-2xl overflow-hidden shadow-lg bg-orange-50">
+          {!imgError ? (
+            <img
+              src={img}
+              alt={pet.name}
+              loading="lazy"
+              onError={() => setImgError(true)}
+              className="w-full h-[260px] sm:h-[400px] object-cover"
+            />
+          ) : (
+            <div className="w-full h-[260px] sm:h-[400px] flex items-center justify-center">
+              <PawPrint className="w-24 h-24 text-orange-200" />
+            </div>
+          )}
           <div className="absolute top-4 right-4 flex gap-2">
             <button
               onClick={handleToggleFavorite}
