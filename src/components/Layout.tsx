@@ -38,7 +38,7 @@ export default function Layout() {
                 <PawPrint className="w-5 h-5 text-white" />
               </div>
               <span className="text-xl font-bold bg-gradient-to-r from-orange-500 to-orange-700 bg-clip-text text-transparent">
-                PetHome
+                ПетХом
               </span>
             </Link>
 
@@ -151,7 +151,7 @@ export default function Layout() {
                 <div className="w-8 h-8 bg-gradient-to-br from-orange-400 to-orange-600 rounded-xl flex items-center justify-center">
                   <PawPrint className="w-4 h-4 text-white" />
                 </div>
-                <span className="text-lg font-bold text-white">PetHome</span>
+                <span className="text-lg font-bold text-white">ПетХом</span>
               </div>
               <p className="text-sm leading-relaxed">Помогаем бездомным животным найти любящий дом. Каждый питомец заслуживает заботу и внимание.</p>
             </div>
@@ -174,7 +174,7 @@ export default function Layout() {
             </div>
           </div>
           <div className="border-t border-gray-700 mt-8 pt-6 text-center text-sm">
-            PetHome &copy; 2026. Все права защищены.
+            ПетХом &copy; 2026. Все права защищены.
           </div>
         </div>
       </footer>

@@ -56,7 +56,7 @@ export default function JoinPage() {
             </span>
           </h1>
           <p className="mt-4 text-lg text-gray-600 leading-relaxed max-w-2xl mx-auto">
-            Вы уже часть сообщества PetHome. Выберите, чем хотите заняться сегодня.
+            Вы уже часть сообщества ПетХом. Выберите, чем хотите заняться сегодня.
           </p>
         </div>
       </section>

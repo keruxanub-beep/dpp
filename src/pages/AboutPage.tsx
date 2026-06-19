@@ -5,7 +5,7 @@ const team = [
     name: 'Анна Соколова',
     role: 'Основатель',
     image: 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=300',
-    desc: 'Начала PetHome после того, как спасла бездомного щенка с улицы Москвы.',
+    desc: 'Начала ПетХом после того, как спасла бездомного щенка с улицы Москвы.',
   },
   {
     name: 'Дмитрий Волков',
@@ -68,7 +68,7 @@ export default function AboutPage() {
                 </span>
               </h1>
               <p className="mt-6 text-lg text-gray-600 leading-relaxed">
-                PetHome — это платформа, которая соединяет бездомных животных с людьми, готовыми дать им любовь и заботу. Мы верим, что каждый питомец заслуживает шанса на счастливую жизнь.
+                ПетХом — это платформа, которая соединяет бездомных животных с людьми, готовыми дать им любовь и заботу. Мы верим, что каждый питомец заслуживает шанса на счастливую жизнь.
               </p>
             </div>
             <div className="hidden md:block">
@@ -76,7 +76,7 @@ export default function AboutPage() {
                 <div className="absolute -inset-4 bg-gradient-to-r from-orange-200 to-orange-300 rounded-3xl blur-2xl opacity-40" />
                 <img
                   src="https://images.pexels.com/photos/406014/pexels-photo-406014.jpeg?auto=compress&cs=tinysrgb&w=800"
-                  alt="Команда PetHome с питомцами"
+                  alt="Команда ПетХом с питомцами"
                   className="relative rounded-3xl shadow-2xl w-full object-cover h-[420px]"
                 />
               </div>
@@ -128,9 +128,9 @@ export default function AboutPage() {
           <div className="max-w-2xl mx-auto space-y-8">
             {[
               { year: '2022', title: 'Начало', desc: 'Анна Соколова спасла щенка с улицы и решила создать платформу для помощи бездомным животным.' },
-              { year: '2023', title: 'Первые 100 усыновлений', desc: 'PetHome помог первым 100 питомцам найти дом. Начали сотрудничество с приютами в 5 городах.' },
+              { year: '2023', title: 'Первые 100 усыновлений', desc: 'ПетХом помог первым 100 питомцам найти дом. Начали сотрудничество с приютами в 5 городах.' },
               { year: '2024', title: 'Расширение', desc: 'Платформа заработала в 12 городах России. Запущена система проверки будущих хозяев.' },
-              { year: '2025', title: '500+ счастливых семей', desc: 'Более 500 питомцев нашли дом. PetHome стал крупнейшей платформой усыновления в стране.' },
+              { year: '2025', title: '500+ счастливых семей', desc: 'Более 500 питомцев нашли дом. ПетХом стал крупнейшей платформой усыновления в стране.' },
             ].map((item, i) => (
               <div key={item.year} className="flex gap-6">
                 <div className="flex flex-col items-center">
@@ -154,7 +154,7 @@ export default function AboutPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-extrabold text-gray-900">Наша команда</h2>
-            <p className="mt-3 text-gray-500">Люди, которые делают PetHome возможным</p>
+            <p className="mt-3 text-gray-500">Люди, которые делают ПетХом возможным</p>
           </div>
           <div className="grid md:grid-cols-3 gap-8">
             {team.map((member) => (
