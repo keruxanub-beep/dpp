@@ -7,6 +7,7 @@ export interface Pet {
   gender: 'male' | 'female';
   size: 'small' | 'medium' | 'large' | null;
   description: string;
+  recommendations: string | null;
   image_url: string | null;
   location: string;
   status: 'available' | 'adopted' | 'pending';

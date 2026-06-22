@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { ArrowLeft, MapPin, Calendar, Heart, Share2, PawPrint, Check, X, Send, AlertCircle, Clock, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, Heart, Share2, PawPrint, Check, X, Send, AlertCircle, Clock, CheckCircle2, ClipboardList } from 'lucide-react';
 
 import { useAuth } from '../lib/auth';
 import type { Pet } from '../lib/types';
@@ -211,6 +211,16 @@ export default function PetDetailPage() {
             <h3 className="font-semibold text-gray-900 mb-2">О питомце</h3>
             <p className="text-gray-600 leading-relaxed">{pet.description}</p>
           </div>
+
+          {pet.recommendations && pet.recommendations.trim() && (
+            <div className="bg-orange-50/60 border border-orange-100 rounded-2xl p-5">
+              <h3 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                <ClipboardList className="w-5 h-5 text-orange-600" />
+                Рекомендации по уходу
+              </h3>
+              <p className="text-gray-600 leading-relaxed whitespace-pre-line">{pet.recommendations}</p>
+            </div>
+          )}
 
           <div className="mt-6">
             <Calendar className="w-4 h-4 text-gray-400 inline mr-1" />

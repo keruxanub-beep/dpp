@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
-import { Plus, Trash2, Edit3, X, PawPrint, Users, BarChart3, Shield, Ban, Unlock, Send, Mail, UserCog, Lock, FileText, Check, XCircle, Clock } from 'lucide-react';
+import { Plus, Trash2, CreditCard as Edit3, X, PawPrint, Users, BarChart3, Shield, Ban, Unlock, Send, Mail, UserCog, Lock, FileText, Check, XCircle, Clock } from 'lucide-react';
 import type { Pet } from '../lib/types';
 import type { Profile } from '../lib/auth';
 import type { AdoptionRequest } from '../lib/types';
@@ -38,11 +38,11 @@ const defaultPetImages: Record<string, string> = {
 
 interface PetForm {
   name: string; species: string; breed: string; age: string; gender: string;
-  size: string; description: string; image_url: string; location: string; status: string;
+  size: string; description: string; recommendations: string; image_url: string; location: string; status: string;
 }
 const emptyForm: PetForm = {
   name: '', species: 'dog', breed: '', age: '', gender: 'male',
-  size: 'medium', description: '', image_url: '', location: '', status: 'available',
+  size: 'medium', description: '', recommendations: '', image_url: '', location: '', status: 'available',
 };
 
 export default function AdminPage() {
@@ -95,7 +95,8 @@ export default function AdminPage() {
     setForm({
       name: pet.name, species: pet.species, breed: pet.breed || '', age: pet.age,
       gender: pet.gender, size: pet.size || 'medium', description: pet.description,
-      image_url: pet.image_url || '', location: pet.location, status: pet.status,
+      recommendations: pet.recommendations || '', image_url: pet.image_url || '', 
+      location: pet.location, status: pet.status,
     });
     setShowPetModal(true);
   }
@@ -108,13 +109,15 @@ export default function AdminPage() {
       await supabase.from('pets').update({
         name: form.name, species: form.species, breed: form.breed || null, age: form.age,
         gender: form.gender, size: form.size || null, description: form.description,
-        image_url: imageUrl, location: form.location, status: form.status,
+        recommendations: form.recommendations || null, image_url: imageUrl,
+        location: form.location, status: form.status,
       }).eq('id', editing.id);
     } else {
       await supabase.from('pets').insert({
         name: form.name, species: form.species, breed: form.breed || null, age: form.age,
         gender: form.gender, size: form.size || null, description: form.description,
-        image_url: imageUrl, location: form.location, status: form.status,
+        recommendations: form.recommendations || null, image_url: imageUrl,
+        location: form.location, status: form.status,
         created_by: profile!.id,
       });
     }
@@ -594,6 +597,8 @@ export default function AdminPage() {
                   <input required value={form.location} onChange={(e) => setForm({...form, location: e.target.value})} placeholder="Москва" className="w-full px-3 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-300" /></div>
                 <div className="col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">Описание</label>
                   <textarea required rows={3} value={form.description} onChange={(e) => setForm({...form, description: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-300 resize-none" /></div>
+                <div className="col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">Рекомендации по уходу</label>
+                  <textarea rows={3} value={form.recommendations} onChange={(e) => setForm({...form, recommendations: e.target.value})} placeholder="Особый корм, прогулки 2 раза в день, не любит детей..." className="w-full px-3 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-300 resize-none" /></div>
                 <div className="col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">URL изображения (необязательно)</label>
                   <input value={form.image_url} onChange={(e) => setForm({...form, image_url: e.target.value})} placeholder="https://..." className="w-full px-3 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-300" /></div>
               </div>
